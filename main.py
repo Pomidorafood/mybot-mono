@@ -1,94 +1,41 @@
 import asyncio
-import requests
+import os
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery
-)
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
-# =====================
-# НАЛАШТУВАННЯ
-# =====================
-
-BOT_TOKEN = "8333200799:AAFmOuLn2uidQrkjv6ODCMdija-_4lgL9sA"
-MONO_TOKEN = "maxQzE_h0vmygXhmEqPAWIQ"
-
-# =====================
-# КНОПКА ОПЛАТИ
-# =====================
+# 🔐 Токени беремо з Environment Variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MONO_TOKEN = os.getenv("MONO_TOKEN")
 
 pay_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Оплатити 600 грн", callback_data="pay_600")]
+        [InlineKeyboardButton(text="💳 Оплатити 600 грн", callback_data="pay")]
     ]
 )
 
-# =====================
-# /start
-# =====================
-
 async def start(message: Message):
     await message.answer(
-        "Привіт! 👋\n\nЩоб продовжити, натисни кнопку оплати 👇",
+        "Привіт 👋\n\nЩоб отримати доступ, потрібно оплатити 600 грн.",
         reply_markup=pay_keyboard
     )
 
-# =====================
-# ОБРОБКА КНОПКИ ОПЛАТИ
-# =====================
-
-async def pay_clicked(callback: CallbackQuery):
-    await callback.answer()  # прибирає "годинник" у кнопці
-
-    headers = {
-        "X-Token": MONO_TOKEN
-    }
-
-    data = {
-        "amount": 60000,  # 600 грн у копійках
-        "ccy": 980,
-        "merchantPaymInfo": {
-            "reference": "order_600",
-            "destination": "Оплата послуги",
-            "comment": "Оплата через Telegram-бот"
-        },
-        # тимчасово, просто щоб monobank не сварився
-        "redirectUrl": "https://t.me/",
-        "webHookUrl": "https://example.com/webhook"
-    }
-
-    response = requests.post(
-        "https://api.monobank.ua/api/merchant/invoice/create",
-        headers=headers,
-        json=data,
-        timeout=10
+async def pay_clicked(callback):
+    await callback.message.answer(
+        "⏳ Перевіряю оплату...\n\n(поки що це тест, далі підключимо Monobank)"
     )
-
-    result = response.json()
-
-    if "pageUrl" in result:
-        await callback.message.answer(
-            f"💳 Оплатіть за посиланням:\n\n{result['pageUrl']}"
-        )
-    else:
-        await callback.message.answer(
-            "❌ Не вдалося створити платіж.\nСпробуйте пізніше."
-        )
-
-# =====================
-# ЗАПУСК БОТА
-# =====================
+    await callback.answer()
 
 async def main():
+    if not BOT_TOKEN:
+        raise ValueError("❌ BOT_TOKEN не знайдено")
+
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
     dp.message.register(start, Command("start"))
-    dp.callback_query.register(pay_clicked, F.data == "pay_600")
+    dp.callback_query.register(pay_clicked, F.data == "pay")
 
     await dp.start_polling(bot)
 
